@@ -1,0 +1,33 @@
+{
+  "name": "marktimejs",
+  "version": "0.1.0",
+  "homepage": "https://github.com/MarkTime/MarkTimeJSv2",
+  "authors": [
+    "mrfishie <me@mrfishie.com>"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "ionic": "~0.9.27",
+    "ng-act": "~0.0.3",
+    "ngCordova": "~0.1.1-alpha"
+  },
+  "devDependencies": {
+    "angular-mocks": "1.2.12"
+  },
+  "overrides": {
+    "ngCordova": {
+      "main": "./dist/ng-cordova.js"
+    }
+  },
+  "resolutions": {
+    "angular": ">= 1.2.23"
+  }
+}

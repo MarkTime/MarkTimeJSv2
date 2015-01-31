@@ -10,11 +10,11 @@ module.exports = function(grunt) {
             files: [
                 './www_dev/**/*',
                 // Don't watch deps or generated files
-                '!./www_dev/js/bundle.js',
-                '!./www_dev/js/bundle.css',
+                '!./www_dev/bundle.js',
+                '!./www_dev/bundle.css',
                 '!./www_dev/bower_components/**'
             ],
-            tasks: ['prepare:debug'],
+            tasks: ['rebuild'],
             options: {
                 'event': ['all']
             }
@@ -24,7 +24,11 @@ module.exports = function(grunt) {
         browserSync: {
             dev: {
                 bsFiles: {
-                    src : 'www_dev/**'
+                    src : [
+                        'www_dev/bundle.js',
+                        'www_dev/bundle.css',
+                        'www_dev/index.html'
+                    ]
                 },
                 options: {
                     watchTask: true,
@@ -57,7 +61,10 @@ module.exports = function(grunt) {
             options: {
                 browserifyOptions: {
                     entries: ['./www_dev/js/app.js']
-                }
+                },
+                /*alias: {
+                    'fs': 'html5-fs'
+                }*/
             },
             debug: {
                 options: {
@@ -268,6 +275,14 @@ module.exports = function(grunt) {
     // Build debug files for ./www
     grunt.registerTask('prepare:debug', [
         'shell:bower-install',
+        'browserify:debug',
+        'wiredep:all',
+        'sass:debug',
+        'cssmin:debug:minify'
+    ]);
+
+    // Rebuilds for the serve task
+    grunt.registerTask('rebuild', [
         'browserify:debug',
         'wiredep:all',
         'sass:debug',

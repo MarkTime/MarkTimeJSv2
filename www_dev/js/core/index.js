@@ -2,11 +2,11 @@
  * MarkTime 'Backend' Javascript
  */
 
-var debug = require('debug')('marktime:core'),
-    api = require('./api'),
-    plugins = require('./plugins'),
-    Promise = require('bluebird'),
-    fs = require('fs');
+var debug = require('debug')('marktime:core');
+var api = require('./api');
+var plugins = require('./plugins');
+var Promise = require('bluebird');
+var fs = require('fs');
 
 exports.api = api;
 exports.plugins = plugins;

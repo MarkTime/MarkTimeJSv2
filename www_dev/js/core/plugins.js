@@ -2,12 +2,12 @@
  * MarkTime Plugin Manager
  */
 
-var debug = require('debug')('marktime:plugins'),
-    Promise = require('bluebird'),
-    marktime = require('./'),
-    Context = require('context-eval'),
-    fs = require('fs'),
-    path = require('path');
+var debug = require('debug')('marktime:plugins');
+var Promise = require('bluebird');
+var marktime = require('./');
+var Context = require('context-eval');
+var fs = require('fs');
+var path = require('path');
 
 /**
  * Creates a new plugin object

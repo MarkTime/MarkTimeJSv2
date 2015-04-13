@@ -31,6 +31,7 @@ E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\www \
 E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\_where-is-www.txt \
 E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\www\bundle.css \
 E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\www\bundle.js \
+E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\www\config.xml \
 E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\www\cordova.js \
 E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\www\cordova_plugins.js \
 E:\Documents\GitHub\MarkTimeJSv2\platforms\android\assets\www\fhconfig.json \

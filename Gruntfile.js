@@ -45,11 +45,11 @@ module.exports = function(grunt) {
                 command: 'bower install'
             },
             'browserify-debug': {
-                command: 'browserify ./www_dev/js/**/*.js -e ./www_dev/js/app.js ' +
+                command: 'browserify "./www_dev/js/**/*.js" -e "./www_dev/js/app.js" ' +
                     '-o ./www_dev/bundle.js -d'
             },
             'browserify-release': {
-                command: 'browserify ./www_dev/js/**/*.js -e ./www_dev/js/app.js ' +
+                command: 'browserify "./www_dev/js/**/*.js" -e "./www_dev/js/app.js" ' +
                     '-o ./www_dev/bundle.js'
             },
             'cordova': {
@@ -72,11 +72,11 @@ module.exports = function(grunt) {
                         debug: true
                     }
                 },
-                src: ['./www_dev/js/**/*.js'],
+                src: ['./www_dev/js/**.js'],
                 dest: './www_dev/bundle.js'
             },
             release: {
-                src: ['./www_dev/js/**/*.js'],
+                src: ['./www_dev/js/***.js'],
                 dest: './www_dev/bundle.js'
             }
         },

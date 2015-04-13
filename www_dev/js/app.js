@@ -1,8 +1,14 @@
 'use strict';
 
+// For debugging
+window.dbg = require('debug');
+
 var constants = require('./constants'),
     controllers = require('./controllers'),
     directives = require('./directives');
+
+var marktime = require('./core');
+marktime.initialize();
 
 function run ($ionicPlatform) {
     $ionicPlatform.ready(function() {
@@ -13,13 +19,21 @@ function run ($ionicPlatform) {
     });
 }
 
-module.exports = angular.module('MyApp', [
+var app = module.exports = angular.module('MarkTime', [
     // Ionic
     'ionic',
-    // Angular FH API shim
-    'FH',
 
     constants.name,
     controllers.name,
     directives.name
-]).run(run);
+]);
+
+app.config(function($stateProvider, $urlRouterProvider) {
+
+});
+
+app.controller('HomeTabCtrl', function($scope) {
+    console.log("HomeTabCtrl");
+});
+
+app.run(run);

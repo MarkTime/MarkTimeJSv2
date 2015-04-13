@@ -15,9 +15,8 @@
     "tests"
   ],
   "dependencies": {
-    "ionic": "~0.9.27",
-    "ng-act": "~0.0.3",
-    "ngCordova": "~0.1.1-alpha"
+    "ngCordova": "~0.1.1-alpha",
+    "ionic": "~0.9.27"
   },
   "devDependencies": {
     "angular-mocks": "1.2.12"

@@ -2,14 +2,21 @@
  * MarkTime Preferences API
  */
 
-var fs = require('fs');
 var marktime = require('../core');
 var util = require('util');
 var Promise = require('bluebird');
 var debug = require('debug')('marktime:api:preferences');
+var Dexie = require('dexie');
 
-var cache = {}, changes = 0, saveTimeout;
-var saveTime, saveChanges;
+var db = new Dexie('marktime');
+db.version(1).stores({
+    prefs: "++id,plugin,props"
+});
+db.open();
+
+var prefTable = db.prefs;
+
+var pluginEntries = {};
 
 /**
  * Creates the object passed to a plugin
@@ -18,68 +25,19 @@ var saveTime, saveChanges;
  * @param {Boolean} readonly
  */
 module.exports = function(api, readonly) {
-    var plugin = this;
-    var prefs = cache[plugin.name];
-    if (!prefs) prefs = cache[plugin.name] = {};
+    var plugin = this, item;
+    if (!pluginEntries[plugin.name]) {
+        item = pluginEntries[plugin.name] = { plugin: plugin.name, props: {} };
+        prefTable.add(item);
+    } else item = pluginEntries[plugin.name];
 
-    var dictionaryCache = {};
-
-    /**
-     * Gets a dictionary or item in a dictionary if the name has a dot
-     *
-     * @param {String} name
-     * @param {Boolean} ronly Whether the dictionary is readonly, does not override the API setting
-     * @returns {Dictionary|ReadonlyDictionary}
-     */
-    api.get = function(name, ronly) {
-        var dotIndex = name.indexOf('.');
-        if (dotIndex !== -1) {
-            var dictionaryName = name.substring(0, dotIndex);
-            var itemName = name.substring(dotIndex + 1, 0);
-            return api.get(dictionaryName).get(itemName);
-        }
-
-        return api.getDictionary(name, ronly);
-    };
-
-    /**
-     * Gets just a dictionary item
-     *
-     * @see get
-     */
-    api.getDictionary = function(name, ronly) {
-        var readonly = readonly || ronly;
-        var rName = name + (readonly ? "0" : "1");
-
-        if (dictionaryCache[rName]) return dictionaryCache[rName];
-        else {
-            if (!prefs[rName]) prefs[rName] = {};
-            return dictionaryCache[name] = readonly ? (new ReadonlyDictionary(name, prefs[name])) : (new Dictionary(name, prefs[name]));
+    var parentObj = {
+        save: function() {
+            prefTable.update(item.id, {props: item.props});
         }
     };
 
-    /**
-     * Sets a dictionary item, in the format <dictionary>.<item>
-     *
-     * @param {String} name The name of the item
-     * @param {*} val The new value
-     * @throws Error if name is invalid
-     */
-    api.set = function(name, val) {
-        var dotIndex = name.indexOf('.');
-        if (dotIndex === -1) throw new Error('Invalid dictionary/item name');
-
-        var dictionaryName = name.substring(0, dotIndex);
-        var itemName = name.substring(dotIndex + 1);
-        return api.get(dictionaryName).set(itemName, val);
-    };
-
-    /**
-     * Saves preferences
-     *
-     * @see Dictionary#save
-     */
-    api.save = save;
+    return readonly ? (new ReadonlyDictionary(plugin.name, item.props, parentObj)) : (new Dictionary(plugin.name, item.props, parentObj));
 };
 
 /**
@@ -88,158 +46,160 @@ module.exports = function(api, readonly) {
  * @returns {Promise}
  */
 exports.initialize = function() {
-    return new Promise(function(resolve, reject) {
-        debug('reading prefs file');
-        fs.readFile(marktime.root + 'prefs.json', {encoding: 'utf8'}, function (err, data) {
-            debug('finished reading prefs file');
-            if (err) return reject(err, debug('read error: %s', err));
-
-            cache = JSON.parse(data);
-
-            if (!cache.config) cache.config = {};
-            saveTime = cache.config["autosave.time"];
-            saveChanges = cache.config["autosave.maxchanges"];
-            saveTimeout = setTimeout(save, saveTime);
-
-            resolve();
-        });
-    });
+    debug('reading prefs db');
+    return Promise.resolve(prefTable.each(function(item) {
+        pluginEntries[item.plugin] = item;
+    }));
 };
 
-/**
- * Saves the preferences
- *
- * @returns {Promise}
- */
-function save() {
-    return new Promise(function(resolve, reject) {
-        clearTimeout(saveTimeout);
-        if (changes > 0) {
-            changes = 0;
-
-            debug('saving preferences');
-            fs.writeFile(marktime.root + 'prefs.json', JSON.stringify(cache), {encoding: 'utf8'}, function (err) {
-                debug('finished writing preferences');
-                if (err) {
-                    debug('write error: %s', err);
-                    reject(err);
-                }
-
-                resolve();
-            });
-        } else resolve();
-    }).then(function() {
-        saveTimeout = setTimeout(save, saveTime);
-    });
+function validate(prop, type) {
+    if (prop.type !== type) throw new Error('Key "' + prop.name + '" is a ' + prop.type + ', not a ' + type);
+    return prop;
 }
 
 /**
  * A dictionary object
- * Some functions are created inside of the constructor in order for the items variable to not
- * be exposed.
+ * Some functions are created inside of the constructor in order for the items variable to not be exposed.
  *
  * @param {String} name The name of the dictionary
  * @param {Object} items
+ * @param {Dictionary|{save: Function}} parent
  * @constructor
  */
-function Dictionary(name, items) {
+function Dictionary(name, items, parent) {
     this.name = name;
     this.readonly = false;
 
-    /**
-     * Gets the item in the dictionary
-     *
-     * @param {String} key
-     * @returns {*} The value
-     */
-    this.get = function(key) {
-        return items[key];
-    };
+    var dictionaryCache = {};
 
     /**
-     * Sets an item in the dictionary
+     * Gets the item in the dictionary, or a child if the name has a dot
      *
-     * @param {String} key
-     * @param {*} value
+     * @param {String} name
+     * @returns {*}
+     * @throws Error if the key is a child dictionary
      */
-    this.set = function(key, value) {
-        items[key] = value;
+    this.get = function(name) {
+        var dotIndex = name.indexOf('.');
+        if (dotIndex !== -1) {
+            var dictName = name.substring(0, dotIndex);
+            var keyName = name.substring(dotIndex + 1);
+            return this.getChild(dictName).get(keyName);
+        }
 
-        changes++;
-        if (changes > saveChanges) save();
-        return value;
+        if (!items[name]) return items[name];
+        var value = validate(items[name], 'property');
+        return value.value;
     };
 
     /**
      * Finds if an item exists
      *
-     * @param {String} key
-     * @returns {Boolean}
+     * @param {String} name
      */
-    this.exists = function(key) {
-        return items.hasOwnProperty(key);
+    this.exists = function(name) {
+        return !!items[name];
+    };
+
+    /**
+     * Gets a child dictionary, creating it if it doesn't exist
+     *
+     * @param {String} name
+     * @param {Boolean?} ronly
+     * @returns {Dictionary}
+     * @throws Error if the key is not a dictionary
+     */
+    this.getChild = function(name, ronly) {
+        var dotIndex = name.indexOf('.');
+        if (dotIndex !== -1) {
+            var dictName = name.substring(0, dotIndex);
+            var keyName = name.substring(dotIndex + 1);
+            return this.getChild(dictName, ronly).getChild(keyName, ronly);
+        }
+
+        if (!items.hasOwnProperty(name)) {
+            items[name] = {
+                name: name,
+                type: 'dictionary',
+                value: {}
+            };
+        }
+
+        var value = validate(items[name], 'dictionary');
+        var isWritable = ronly ? "0" : "1";
+        var rName = name + isWritable;
+
+        if (dictionaryCache[rName]) return dictionaryCache[rName];
+        else {
+            return dictionaryCache[rName] = ronly ? (new ReadonlyDictionary(name, value.value, this)) : (new Dictionary(name, value.value, this));
+        }
+    };
+
+    /**
+     * Sets an item in the dictionary, or a child if the name has a dot
+     *
+     * @param {String} name
+     * @param {*} value
+     * @throws Error if the key is a child dictionary
+     */
+    this.set = function(name, value) {
+        var dotIndex = name.indexOf('.');
+        if (dotIndex !== -1) {
+            var dictName = name.substring(0, dotIndex);
+            var keyName = name.substring(dotIndex + 1);
+            return this.getChild(dictName).set(keyName);
+        }
+
+        if (items[name]) validate(items[name], 'property').value = value;
+        else {
+            items[name] = {
+                name: name,
+                type: 'property',
+                value: value
+            };
+        }
+    };
+
+    /**
+     * Saves any modifications to the dictionary
+     *
+     * This shouldn't need to be used normally, as the .set function saves whenever a modification is made.
+     */
+    this.save = function() {
+        parent.save();
     };
 }
 
 /**
- * If the key exists, gets it, otherwise sets it
+ * A read-only dictionary
  *
- * @param {String} key
- * @param {*} value
- * @returns {*}
- */
-Dictionary.prototype.maybe = function(key, value) {
-    if (this.exists(key)) return this.get(key);
-    else return this.set(key, value);
-};
-
-/**
- * Saves the preferences
- *
- * Preferences are stored in the root Marktime directory, in the `prefs.json` file.
- *
- * By default, preferences are autosaved after a certain amount of time, or certain amount of modifications. These
- * amounts can be changed by changing the 'preferences.autosave.time' and 'preferences.autosave.maxchanges'
- * configuration values in the 'global' dictionary for MarkTime:
- *
- * 'preferences.autosave.time'          - Integer, the amount of time to wait in-between each autosave. It is reset
- *                                        every time the preferences are saved.
- * 'preferences.autosave.maxchanges'    - Integer, the amount of changes until the preferences will be saved. It is
- *                                        reset every time the preferences are saved. Setting
- *                                        values are the only modifications that increment the current amount of
- *                                        changes.
- *
- * @returns {Promise}
- */
-Dictionary.prototype.save = save;
-
-/**
- * A readonly dictionary object
- *
- * @inherits Dictionary
  * @constructor
+ * @inherits Dictionary
  */
-function ReadonlyDictionary() {
+function ReadonlyDictionary(dictName) {
     Dictionary.apply(this, arguments);
     this.readonly = true;
 
     /**
      * Throws an error, because .set is not supported in a readonly dictionary
      *
+     * @param {String} name
      * @throws Error
      */
-    this.set = function() {
-        throw new Error('Dictionary#set is not supported in read-only mode');
+    this.set = function(name) {
+        throw new Error('Cannot set key "' + name + '" as dictionary "' + dictName + '" is in readonly mode');
     };
+
+    var getChild = this.getChild;
+
+    /**
+     * Don't allow getting a non-readonly child
+     *
+     * @param {String} name
+     */
+    this.getChild = function(name) {
+        return getChild(name, true);
+    }
 }
 
 util.inherits(ReadonlyDictionary, Dictionary);
-
-/**
- * Throws an error, because .save is not supported in a readonly dictionary
- *
- * @throws Error
- */
-ReadonlyDictionary.prototype.save = function() {
-    throw new Error('Dictionary#save is not supported in read-only mode');
-};
